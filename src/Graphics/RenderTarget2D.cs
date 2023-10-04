@@ -213,7 +213,7 @@ namespace Microsoft.Xna.Framework.Graphics
 
 		internal override GraphicsResourceDisposalHandle[] CreateDisposalHandles()
 		{
-			int length = 0;
+			int length = 1;
 			int index = 0;
 			
 			if (glColorBuffer != IntPtr.Zero)
@@ -227,6 +227,12 @@ namespace Microsoft.Xna.Framework.Graphics
 			}
 
 			GraphicsResourceDisposalHandle[] handles = new GraphicsResourceDisposalHandle[length];
+
+			handles[index] = new GraphicsResourceDisposalHandle
+			{
+				disposeAction = FNA3D.FNA3D_AddDisposeTexture,
+				resourceHandle = texture
+			};
 
 			if (glColorBuffer != IntPtr.Zero)
 			{
