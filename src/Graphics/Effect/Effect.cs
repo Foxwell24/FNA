@@ -73,8 +73,6 @@ namespace Microsoft.Xna.Framework.Graphics
 			}
 		}
 
-		private IntPtr stateChangesPtr;
-
 		#endregion
 
 		#region Private Static Variables
@@ -232,19 +230,6 @@ namespace Microsoft.Xna.Framework.Graphics
 
 			// The default technique is the first technique.
 			CurrentTechnique = Techniques[0];
-
-			// Use native memory for changes, .NET loves moving this around
-			unsafe
-			{
-				stateChangesPtr = FNAPlatform.Malloc(
-					sizeof(MOJOSHADER_effectStateChanges)
-				);
-				MOJOSHADER_effectStateChanges *stateChanges =
-					(MOJOSHADER_effectStateChanges*) stateChangesPtr;
-				stateChanges->render_state_change_count = 0;
-				stateChanges->sampler_state_change_count = 0;
-				stateChanges->vertex_sampler_state_change_count = 0;
-			}
 		}
 
 		#endregion
@@ -281,19 +266,6 @@ namespace Microsoft.Xna.Framework.Graphics
 					CurrentTechnique = Techniques[i];
 				}
 			}
-
-			// Use native memory for changes, .NET loves moving this around
-			unsafe
-			{
-				stateChangesPtr = FNAPlatform.Malloc(
-					sizeof(MOJOSHADER_effectStateChanges)
-				);
-				MOJOSHADER_effectStateChanges *stateChanges =
-					(MOJOSHADER_effectStateChanges*) stateChangesPtr;
-				stateChanges->render_state_change_count = 0;
-				stateChanges->sampler_state_change_count = 0;
-				stateChanges->vertex_sampler_state_change_count = 0;
-			}
 		}
 
 		#endregion
@@ -303,6 +275,22 @@ namespace Microsoft.Xna.Framework.Graphics
 		public virtual Effect Clone()
 		{
 			return new Effect(this);
+		}
+
+		#endregion
+
+		#region Emergency Disposal
+
+		internal override GraphicsResourceDisposalHandle[] CreateDisposalHandles()
+		{
+			return new GraphicsResourceDisposalHandle[]
+			{
+				new GraphicsResourceDisposalHandle
+				{
+					disposeAction = FNA3D.FNA3D_AddDisposeEffect,
+					resourceHandle = glEffect
+				}
+			};
 		}
 
 		#endregion
@@ -319,11 +307,6 @@ namespace Microsoft.Xna.Framework.Graphics
 						GraphicsDevice.GLDevice,
 						glEffect
 					);
-				}
-				if (stateChangesPtr != IntPtr.Zero)
-				{
-					FNAPlatform.Free(stateChangesPtr);
-					stateChangesPtr = IntPtr.Zero;
 				}
 			}
 			base.Dispose(disposing);
@@ -343,10 +326,10 @@ namespace Microsoft.Xna.Framework.Graphics
 				GraphicsDevice.GLDevice,
 				glEffect,
 				pass,
-				stateChangesPtr
+				GraphicsDevice.effectStateChangesPtr
 			);
 			MOJOSHADER_effectStateChanges *stateChanges =
-				(MOJOSHADER_effectStateChanges*) stateChangesPtr;
+				(MOJOSHADER_effectStateChanges*) GraphicsDevice.effectStateChangesPtr;
 			if (stateChanges->render_state_change_count > 0)
 			{
 				PipelineCache pipelineCache = GraphicsDevice.PipelineCache;

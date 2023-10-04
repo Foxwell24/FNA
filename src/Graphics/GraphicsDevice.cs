@@ -9,6 +9,7 @@
 
 #region Using Statements
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 #endregion
@@ -275,6 +276,12 @@ namespace Microsoft.Xna.Framework.Graphics
 
 		#endregion
 
+		#region Internal State Changes Pointer
+
+		internal IntPtr effectStateChangesPtr;
+
+		#endregion
+
 		#region Private Disposal Variables
 
 		/* Use WeakReference for the global resources list as we do not
@@ -461,6 +468,19 @@ namespace Microsoft.Xna.Framework.Graphics
 
 			// Allocate the pipeline cache to be used by Effects
 			PipelineCache = new PipelineCache(this);
+
+			// Set up the effect state changes pointer.
+			unsafe
+			{
+				effectStateChangesPtr = FNAPlatform.Malloc(
+					sizeof(Effect.MOJOSHADER_effectStateChanges)
+				);
+                Effect.MOJOSHADER_effectStateChanges* stateChanges =
+					(Effect.MOJOSHADER_effectStateChanges*) effectStateChangesPtr;
+				stateChanges->render_state_change_count = 0;
+				stateChanges->sampler_state_change_count = 0;
+				stateChanges->vertex_sampler_state_change_count = 0;
+			}
 		}
 
 		~GraphicsDevice()
@@ -485,6 +505,8 @@ namespace Microsoft.Xna.Framework.Graphics
 					{
 						Disposing(this, EventArgs.Empty);
 					}
+
+					FlushEmergencyDisposalQueue();
 
 					/* Dispose of all remaining graphics resources before
 					 * disposing of the GraphicsDevice.
@@ -517,6 +539,8 @@ namespace Microsoft.Xna.Framework.Graphics
 						);
 					}
 
+					FNAPlatform.Free(effectStateChangesPtr);
+
 					// Dispose of the GL Device/Context
 					FNA3D.FNA3D_DestroyDevice(GLDevice);
 				}
@@ -547,6 +571,30 @@ namespace Microsoft.Xna.Framework.Graphics
 
 		#endregion
 
+		#region Emergency Disposal / Finalization
+
+		ConcurrentQueue<GraphicsResourceDisposalHandle> emergencyDisposalQueue = new ConcurrentQueue<GraphicsResourceDisposalHandle>();
+
+		internal void RegisterForEmergencyDisposal(GraphicsResourceDisposalHandle[] handles)
+		{
+			for (int i = 0; i < handles.Length; i += 1)
+			{
+				emergencyDisposalQueue.Enqueue(handles[i]);
+			}
+		}
+
+		private void FlushEmergencyDisposalQueue()
+		{
+			GraphicsResourceDisposalHandle handle;
+
+			while (emergencyDisposalQueue.TryDequeue(out handle))
+			{
+				handle.Dispose(this);
+			}
+		}
+
+		#endregion
+
 		#region Public Present Method
 
 		public void Present()
@@ -557,6 +605,8 @@ namespace Microsoft.Xna.Framework.Graphics
 				IntPtr.Zero,
 				PresentationParameters.DeviceWindowHandle
 			);
+
+			FlushEmergencyDisposalQueue();
 		}
 
 		public void Present(
@@ -608,6 +658,8 @@ namespace Microsoft.Xna.Framework.Graphics
 					overrideWindowHandle
 				);
 			}
+
+			FlushEmergencyDisposalQueue();
 		}
 
 		#endregion

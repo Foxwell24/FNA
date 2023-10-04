@@ -208,5 +208,49 @@ namespace Microsoft.Xna.Framework.Graphics
 		}
 
 		#endregion
+
+		#region Emergency Disposal
+
+		internal override GraphicsResourceDisposalHandle[] CreateDisposalHandles()
+		{
+			int length = 0;
+			int index = 0;
+			
+			if (glColorBuffer != IntPtr.Zero)
+			{
+				length += 1;
+			}
+
+			if (glDepthStencilBuffer != IntPtr.Zero)
+			{
+				length += 1;
+			}
+
+			GraphicsResourceDisposalHandle[] handles = new GraphicsResourceDisposalHandle[length];
+
+			if (glColorBuffer != IntPtr.Zero)
+			{
+				handles[index] = new GraphicsResourceDisposalHandle
+				{
+					disposeAction = FNA3D.FNA3D_AddDisposeRenderbuffer,
+					resourceHandle = glColorBuffer
+				};
+				index += 1;
+			}
+
+			if (glDepthStencilBuffer != IntPtr.Zero)
+			{
+				handles[index] = new GraphicsResourceDisposalHandle
+				{
+					disposeAction = FNA3D.FNA3D_AddDisposeRenderbuffer,
+					resourceHandle = glDepthStencilBuffer
+				};
+				index += 1;
+			}
+			
+			return handles;
+		}
+
+		#endregion
 	}
 }
